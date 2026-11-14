@@ -12,7 +12,7 @@ tablet runs it today; other hardware (a Pi with a touchscreen, say) can follow l
 
 **Status:** early. Pairing, typing, talking and the Chat view were tested on a Samsung phone
 against the test station in `tools/`. The Portrait view and a real Luna are the next round
-of testing. See [PLAN.md](PLAN.md) for what's built, what's next and why.
+of testing.
 
 ## What you need
 
@@ -30,7 +30,8 @@ of testing. See [PLAN.md](PLAN.md) for what's built, what's next and why.
 
 There's no store listing; the app is installed from its APK file.
 
-1. Get the APK: build it (below), or download it from this repo's Releases once there are any.
+1. Get the APK: download `luna-station-<version>.apk` from this repo's
+   [Releases](../../releases) page, or build it yourself (below).
 2. Copy it to the device and open it. Android asks to allow installing from that app (Files,
    Chrome) the first time; allow it.
    - **Fire tablets:** Settings, Security and Privacy, **Apps from Unknown Sources**, then
@@ -113,6 +114,8 @@ Luna: Forget this PC, then pair with her again.
   `app/build/outputs/apk/debug/`.
 - **Tests:** `./gradlew testDebugUnitTest` (pairing links, certificate checks, WAV files, when
   the mic stops listening).
+- **Releases:** GitHub builds and signs the APK from a version tag; how to set that up is in
+  [tools/ci/README.md](tools/ci/README.md).
 
 ## Details
 
