@@ -1,0 +1,21 @@
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+# signing: the release keystore and its passwords never go in git
+*.jks
+*.keystore
+keystore.properties
+# Kotlin's and Python's caches, and the test station's venv
+.kotlin
+__pycache__
+.venv
+/app/build
+/Claude outputs/
+/publish-github.sh

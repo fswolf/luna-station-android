@@ -1,0 +1,8 @@
+<resources>
+    <!-- Only the window behind Compose: dark from the first frame, no white flash. -->
+    <style name="Theme.Luna" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/luna_bg</item>
+        <item name="android:statusBarColor">@color/luna_bg</item>
+        <item name="android:navigationBarColor">@color/luna_bg</item>
+    </style>
+</resources>

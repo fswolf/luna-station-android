@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Luna's emblem, simplified: a lavender crescent and her pink dot. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#B48CFF" android:pathData="M52.28,30.00 A24,24 0 1,0 74.26,62.97 A20,20 0 0,1 52.28,30.00 Z" />
+    <path android:fillColor="#FF87D7" android:pathData="M66,52m-5,0a5,5 0 1,0 10,0a5,5 0 1,0 -10,0" />
+</vector>

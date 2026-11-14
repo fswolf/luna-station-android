@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Plain HTTP is allowed for one request only in practice: fetching luna-ca.crt from the
+    PC's setup port while pairing (station/StationClient.kt, fetchCa). It can't be scoped
+    to a domain here because the PC's address is whatever the home network gave it; the
+    code only ever makes that request to a home-network address (PairLink.isHomeAddress).
+
+    Everything to the station itself is HTTPS and trusts only Luna's own certificate
+    authority (station/LunaCa.kt), not the system list below.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

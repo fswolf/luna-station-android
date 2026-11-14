@@ -1,0 +1,6 @@
+<resources>
+    <!-- Luna's terminal theme, as on luna.imbored.me -->
+    <color name="luna_bg">#FF14111F</color>
+    <color name="luna_pink">#FFFF87D7</color>
+    <color name="luna_violet">#FFB48CFF</color>
+</resources>
