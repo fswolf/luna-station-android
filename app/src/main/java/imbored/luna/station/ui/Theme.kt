@@ -14,18 +14,26 @@ object LunaColors {
     val Cyan = Color(0xFF5FD7FF)
     val Text = Color(0xFFE8E3F5)
     val Muted = Color(0xFF9A93B0)
+    val Mine = Color(0xFF352A52)      // your bubbles: surface with a little more violet in it
+    val Outline = Color(0xFF3A2D55)   // field borders and dividers, the site's panel border
 }
 
+// Violet is the colour of doing things (buttons, the mic, the switch), pink is Luna herself
+// (her name, Stop, anything that needs attention). Outline on the fields so they sit quietly
+// until focused.
 private val scheme = darkColorScheme(
-    primary = LunaColors.Pink,
-    secondary = LunaColors.Violet,
+    primary = LunaColors.Violet,
+    secondary = LunaColors.Pink,
     tertiary = LunaColors.Cyan,
     background = LunaColors.Background,
     surface = LunaColors.Surface,
+    surfaceVariant = LunaColors.Surface,
+    outline = LunaColors.Outline,
     onPrimary = LunaColors.Background,
     onSecondary = LunaColors.Background,
     onBackground = LunaColors.Text,
     onSurface = LunaColors.Text,
+    onSurfaceVariant = LunaColors.Muted,
 )
 
 @Composable

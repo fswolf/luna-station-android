@@ -11,8 +11,8 @@ the speaker, and it talks to Luna over your home network, never the internet. A 
 tablet runs it today; other hardware (a Pi with a touchscreen, say) can follow later.
 
 <p align="center">
-  <img src="docs/screenshots/portrait.jpg" width="240" alt="The Portrait view: her 3D portrait full screen, with the talk button">
-  <img src="docs/screenshots/chat.png" width="240" alt="The Chat view: her reply as text while her voice plays">
+  <img src="docs/screenshots/portrait.jpg" width="240" alt="The Portrait view: her 3D portrait, her words as she speaks them, and the talk button">
+  <img src="docs/screenshots/chat.png" width="240" alt="The Chat view: your message and her reply while her voice plays">
   <img src="docs/screenshots/unpaired.png" width="240" alt="The first screen, before pairing with a PC">
 </p>
 

@@ -4,6 +4,11 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -13,10 +18,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -34,6 +41,7 @@ import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -45,7 +53,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
@@ -124,21 +134,32 @@ fun ChatScreen(s: Screen.Paired, chat: Chat, act: ChatActions) {
                 items(chat.messages.asReversed(), key = { it.id }) { Bubble(it) }
             }
             (chat.note ?: micNote)?.let { Line(it, LunaColors.Pink) }
-            if (chat.status.isNotEmpty()) Line(chat.status, LunaColors.Muted)
+            if (chat.status.isNotEmpty()) Line(chat.status, LunaColors.Muted, dot = LunaColors.Violet)
             chat.ask?.let { AskCard(it, act.answer) }
             Row(
-                Modifier.fillMaxWidth().padding(8.dp),
+                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                MicButton(chat, onClick = mic, size = 52)
+                MicButton(chat, onClick = mic, size = 48)
                 val sendNow = { if (!chat.busy && text.isNotBlank()) { act.send(text); text = "" } }
+                // a quiet pill: outline until it's focused, never a loud border
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it.take(2000) },          // Luna's limit for typed turns
-                    placeholder = { Text("Say something") },
+                    placeholder = { Text("Say something", color = LunaColors.Muted) },
                     modifier = Modifier.weight(1f),
                     maxLines = 4,
+                    shape = RoundedCornerShape(24.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = LunaColors.Violet,
+                        unfocusedBorderColor = LunaColors.Outline,
+                        disabledBorderColor = LunaColors.Outline,
+                        focusedContainerColor = LunaColors.Surface,
+                        unfocusedContainerColor = LunaColors.Surface,
+                        disabledContainerColor = LunaColors.Surface,
+                        cursorColor = LunaColors.Pink,
+                    ),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(onSend = { sendNow() }),
                     enabled = !chat.recording,
@@ -164,14 +185,15 @@ private fun Header(s: Screen.Paired, portrait: Boolean, onSwitch: (Boolean) -> U
         is Link.Down -> LunaColors.Pink to "can't reach"
     }
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         // tapping the name or the status opens the info box (connection, certificate, Forget)
-        Text("Luna", color = LunaColors.Pink, fontSize = 22.sp, fontWeight = FontWeight.Bold,
+        Text("Luna", color = LunaColors.Pink, fontSize = 24.sp, fontWeight = FontWeight.Bold,
             modifier = Modifier.clickable(onClick = onInfo))
-        Row {
+        // the switch sits in a track, so the two halves read as one control
+        Row(Modifier.clip(RoundedCornerShape(50)).background(LunaColors.Surface).padding(3.dp)) {
             Switch2("Chat", !portrait) { onSwitch(false) }
             Switch2("Portrait", portrait) { onSwitch(true) }
         }
@@ -208,22 +230,39 @@ private fun Switch2(label: String, on: Boolean, onClick: () -> Unit) {
     )
 }
 
+/** The talk button. While the mic is open a pink ring breathes out from it, so you can see she's listening. */
 @Composable
 private fun MicButton(chat: Chat, onClick: () -> Unit, size: Int) {
-    FilledIconButton(
-        onClick = onClick,
-        enabled = !chat.busy,
-        colors = IconButtonDefaults.filledIconButtonColors(
-            containerColor = if (chat.recording) LunaColors.Pink else LunaColors.Violet,
-            contentColor = LunaColors.Background,
-        ),
-        modifier = Modifier.size(size.dp),
-    ) {
-        Icon(
-            painterResource(R.drawable.ic_mic),
-            contentDescription = if (chat.recording) "Send what you said" else "Talk",
-            modifier = Modifier.size((size / 2).dp),
-        )
+    Box(contentAlignment = Alignment.Center) {
+        if (chat.recording) {
+            val pulse = rememberInfiniteTransition(label = "mic")
+            val grow by pulse.animateFloat(
+                initialValue = 1f, targetValue = 1.5f,
+                animationSpec = infiniteRepeatable(tween(1100), RepeatMode.Restart), label = "ring",
+            )
+            Box(
+                Modifier.size(size.dp)
+                    .graphicsLayer { scaleX = grow; scaleY = grow; alpha = (1.5f - grow) * 1.2f }
+                    .clip(CircleShape).background(LunaColors.Pink),
+            )
+        }
+        FilledIconButton(
+            onClick = onClick,
+            enabled = !chat.busy,
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = if (chat.recording) LunaColors.Pink else LunaColors.Violet,
+                contentColor = LunaColors.Background,
+                disabledContainerColor = LunaColors.Surface,
+                disabledContentColor = LunaColors.Muted,
+            ),
+            modifier = Modifier.size(size.dp),
+        ) {
+            Icon(
+                painterResource(R.drawable.ic_mic),
+                contentDescription = if (chat.recording) "Send what you said" else "Talk",
+                modifier = Modifier.size((size / 2).dp),
+            )
+        }
     }
 }
 
@@ -243,6 +282,11 @@ private fun PortraitPane(
     val last = chat.messages.lastOrNull()
     Box(Modifier.fillMaxSize()) {
         PortraitView(p, Modifier.fillMaxSize())
+        // a soft dark fade behind her words and the button, so they read over any background
+        Box(
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(260.dp)
+                .background(Brush.verticalGradient(listOf(Color.Transparent, LunaColors.Background.copy(alpha = 0.92f)))),
+        )
         Column(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -255,9 +299,11 @@ private fun PortraitPane(
                     color = if (last.mine) LunaColors.Muted else LunaColors.Text,
                     maxLines = 4,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                    modifier = Modifier.clip(RoundedCornerShape(12.dp))
-                        .background(LunaColors.Background.copy(alpha = 0.75f))
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    fontSize = 16.sp,
+                    lineHeight = 22.sp,
+                    modifier = Modifier.clip(RoundedCornerShape(14.dp))
+                        .background(LunaColors.Background.copy(alpha = 0.6f))
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
                 )
             }
             note?.let { Text(it, color = LunaColors.Pink, fontSize = 13.sp) }
@@ -276,17 +322,21 @@ private fun PortraitPane(
 @Composable
 private fun Bubble(m: Message) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = if (m.mine) Arrangement.End else Arrangement.Start) {
+        // a small corner on the side the bubble came from, like a speech tail
+        val shape = if (m.mine) RoundedCornerShape(18.dp, 4.dp, 18.dp, 18.dp) else RoundedCornerShape(4.dp, 18.dp, 18.dp, 18.dp)
         Column(
             Modifier
-                .widthIn(max = 320.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(if (m.mine) Color(0xFF2E2547) else LunaColors.Surface)
+                .widthIn(max = 340.dp)
+                .clip(shape)
+                .background(if (m.mine) LunaColors.Mine else LunaColors.Surface)
                 .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
             Text(
                 m.text,
                 color = if (m.waiting) LunaColors.Muted else LunaColors.Text,
                 fontStyle = if (m.waiting) FontStyle.Italic else FontStyle.Normal,
+                fontSize = 16.sp,
+                lineHeight = 22.sp,
             )
             if (m.cut) Text("stopped", color = LunaColors.Muted, fontSize = 11.sp)
         }
@@ -294,15 +344,22 @@ private fun Bubble(m: Message) {
 }
 
 @Composable
-private fun Line(text: String, color: Color) =
-    Text(text, color = color, fontSize = 13.sp, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp))
+private fun Line(text: String, color: Color, dot: Color? = null) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (dot != null) {
+            Box(Modifier.size(6.dp).clip(CircleShape).background(dot))
+            Spacer(Modifier.width(6.dp))
+        }
+        Text(text, color = color, fontSize = 13.sp)
+    }
+}
 
 /** Her permission question, asked on this device and answered here. Two minutes unanswered is a no. */
 @Composable
 private fun AskCard(ask: imbored.luna.station.station.StationClient.Ask, answer: (Boolean) -> Unit) {
     Column(
-        Modifier.fillMaxWidth().padding(8.dp).clip(RoundedCornerShape(12.dp))
-            .background(LunaColors.Surface).padding(12.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp).clip(RoundedCornerShape(16.dp))
+            .background(LunaColors.Surface).padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text("Luna asks: ${ask.title}", color = if (ask.warn) LunaColors.Pink else LunaColors.Text, fontWeight = FontWeight.Bold)

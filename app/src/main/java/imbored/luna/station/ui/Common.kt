@@ -1,11 +1,13 @@
 package imbored.luna.station.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -13,8 +15,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -32,6 +36,17 @@ fun Page(content: @Composable ColumnScope.() -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         content = content,
     )
+}
+
+/** Her mark, the launcher icon drawn live: a lavender crescent with her pink dot. */
+@Composable
+fun Crescent(size: Dp = 96.dp) {
+    Canvas(Modifier.size(size)) {
+        val r = this.size.minDimension / 2f
+        drawCircle(LunaColors.Violet, r)
+        drawCircle(LunaColors.Background, r * 0.84f, center + Offset(r * 0.40f, -r * 0.22f))
+        drawCircle(LunaColors.Pink, r * 0.13f, center + Offset(r * 0.50f, r * 0.48f))
+    }
 }
 
 @Composable

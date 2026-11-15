@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 @Composable
 fun WorkingScreen(step: String) {
     Page {
+        Crescent()
         Title("Luna")
         CircularProgressIndicator(color = LunaColors.Violet)
         Note(step, LunaColors.Text)

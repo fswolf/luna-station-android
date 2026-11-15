@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
@@ -27,17 +28,21 @@ fun UnpairedScreen(note: String?, onScan: () -> Unit, onType: () -> Unit, onCame
     }
 
     Page {
+        Crescent()
         Title("Luna")
         Text("Not paired yet", color = LunaColors.Text, fontSize = 20.sp)
         Note("On the PC: settings page, Relay stations, Add a phone or tablet. Then scan the code it shows.")
         if (note != null) Note(note, LunaColors.Pink)
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(16.dp))
         if (hasCamera) {
-            Button(onClick = {
-                val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                    PackageManager.PERMISSION_GRANTED
-                if (granted) onScan() else askCamera.launch(Manifest.permission.CAMERA)
-            }) { Text("Scan the code") }
+            Button(
+                onClick = {
+                    val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                        PackageManager.PERMISSION_GRANTED
+                    if (granted) onScan() else askCamera.launch(Manifest.permission.CAMERA)
+                },
+                modifier = Modifier.fillMaxWidth(0.8f).height(52.dp),
+            ) { Text("Scan the code", fontSize = 16.sp) }
         }
         TextButton(onClick = onType) { Text(if (hasCamera) "Type it instead" else "Type the address and code") }
     }
