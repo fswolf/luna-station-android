@@ -105,7 +105,10 @@ fun ChatScreen(s: Screen.Paired, chat: Chat, act: ChatActions) {
         if (last?.mine == true || list.firstVisibleItemIndex <= 1) list.animateScrollToItem(0)
     }
 
-    Column(Modifier.fillMaxSize().background(LunaColors.Background).safeDrawingPadding()) {
+    // see-through while the portrait shows: her WebView is under this Compose tree (MainActivity),
+    // and the activity's own background is the same colour
+    val fill = if (portrait) Modifier else Modifier.background(LunaColors.Background)
+    Column(Modifier.fillMaxSize().then(fill).safeDrawingPadding()) {
         Header(s, portrait, onSwitch = { portrait = it }, onInfo = { showInfo = true })
         val pairing = act.pairing()
         if (portrait && pairing != null) {

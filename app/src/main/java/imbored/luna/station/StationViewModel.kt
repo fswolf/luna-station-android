@@ -25,7 +25,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * Which screen is showing, the pairing behind it, and the conversation. Survives rotation;
- * the conversation lives only here (no history kept on the device, per PLAN.md).
+ * the conversation lives only here (no history kept on the device).
  */
 class StationViewModel(app: Application) : AndroidViewModel(app) {
 

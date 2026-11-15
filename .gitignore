@@ -19,3 +19,4 @@ __pycache__
 /app/build
 /Claude outputs/
 /publish-github.sh
+/PLAN.md
