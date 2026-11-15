@@ -10,6 +10,12 @@ Luna does all the thinking on your own PC or server. The app is only the screen,
 the speaker, and it talks to Luna over your home network, never the internet. A phone or
 tablet runs it today; other hardware (a Pi with a touchscreen, say) can follow later.
 
+<p align="center">
+  <img src="docs/screenshots/portrait.jpg" width="240" alt="The Portrait view: her 3D portrait full screen, with the talk button">
+  <img src="docs/screenshots/chat.png" width="240" alt="The Chat view: her reply as text while her voice plays">
+  <img src="docs/screenshots/unpaired.png" width="240" alt="The first screen, before pairing with a PC">
+</p>
+
 **Status:** early. Pairing, typing, talking and the Chat view were tested on a Samsung phone
 against the test station in `tools/`. The Portrait view and a real Luna are the next round
 of testing.

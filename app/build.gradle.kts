@@ -24,7 +24,7 @@ android {
         // the release workflow passes the tag (v0.2.0 -> 0.2.0) and its run number, which only
         // ever goes up, so each release installs over the last one
         versionCode = env("LUNA_VERSION_CODE")?.toIntOrNull() ?: 1
-        versionName = env("LUNA_VERSION") ?: "0.1.0-dev"
+        versionName = env("LUNA_VERSION") ?: "0.2.0-dev"
     }
 
     signingConfigs {
