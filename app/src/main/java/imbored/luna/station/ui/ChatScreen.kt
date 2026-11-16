@@ -9,6 +9,9 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import android.app.Activity
+import android.net.Uri
+import android.view.WindowManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
@@ -39,13 +43,16 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -82,6 +89,8 @@ class ChatActions(
     val forget: () -> Unit,
     val leave: () -> Unit,
     val pairing: () -> imbored.luna.station.station.Pairing?,
+    val attach: (Uri) -> Unit,
+    val detach: () -> Unit,
 )
 
 /** The conversation, like a messaging app: your words on the right, hers on the left. */
@@ -94,9 +103,19 @@ fun ChatScreen(s: Screen.Paired, chat: Chat, act: ChatActions) {
     }
     var text by rememberSaveable { mutableStateOf("") }
     var showInfo by rememberSaveable { mutableStateOf(false) }
-    var portrait by rememberSaveable { mutableStateOf(false) }   // Chat | Portrait: both share the one turn
-    var micNote by rememberSaveable { mutableStateOf<String?>(null) }
     val context = LocalContext.current
+    val prefs = remember { Prefs(context) }
+    var keepAwake by remember { mutableStateOf(prefs.keepAwake) }
+    var startPortrait by remember { mutableStateOf(prefs.startPortrait) }
+    var portrait by rememberSaveable { mutableStateOf(prefs.startPortrait) }   // Chat | Portrait: both share the one turn
+    var showSettings by rememberSaveable { mutableStateOf(false) }
+    // Keep the screen on while she's open, if asked (Settings): a station on a stand shouldn't go dark.
+    DisposableEffect(keepAwake) {
+        val window = (context as? Activity)?.window
+        if (keepAwake) window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+    }
+    var micNote by rememberSaveable { mutableStateOf<String?>(null) }
     val askMic = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) act.talk()
         else micNote = "Luna isn't allowed to use the microphone. Allow it in Settings, Apps, Luna, Permissions."
@@ -107,6 +126,13 @@ fun ChatScreen(s: Screen.Paired, chat: Chat, act: ChatActions) {
             PackageManager.PERMISSION_GRANTED
         if (granted) act.talk() else askMic.launch(Manifest.permission.RECORD_AUDIO)
     }
+    // The attach button's picker: Android's own document picker, no storage permission needed.
+    // It offers only the kinds of file this Luna takes (pictures only if she can see them).
+    val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(act.attach) }
+    val pickTypes = chat.attachments?.let { a ->
+        val docs = a.docTypes + (if (a.docTypes.any { it.startsWith("text/") }) listOf("text/*") else emptyList())
+        ((if (a.canSee != false) a.imageTypes else emptyList()) + docs).distinct().toTypedArray()
+    }
     val list = rememberLazyListState()
     // Newest at the bottom; the list is reversed, so item 0 is the newest. Follow it only
     // when you're already there, so reading back isn't yanked away. Your own message always jumps.
@@ -115,103 +141,201 @@ fun ChatScreen(s: Screen.Paired, chat: Chat, act: ChatActions) {
         if (last?.mine == true || list.firstVisibleItemIndex <= 1) list.animateScrollToItem(0)
     }
 
-    // see-through while the portrait shows: her WebView is under this Compose tree (MainActivity),
-    // and the activity's own background is the same colour
-    val fill = if (portrait) Modifier else Modifier.background(LunaColors.Background)
-    Column(Modifier.fillMaxSize().then(fill).safeDrawingPadding()) {
-        Header(s, portrait, onSwitch = { portrait = it }, onInfo = { showInfo = true })
-        val pairing = act.pairing()
-        if (portrait && pairing != null) {
-            PortraitPane(pairing, chat, onMic = mic, onStop = act.stop, onAnswer = act.answer, note = chat.note ?: micNote)
-        } else {
-            LazyColumn(
-                state = list,
-                reverseLayout = true,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(chat.messages.asReversed(), key = { it.id }) { Bubble(it) }
-            }
-            (chat.note ?: micNote)?.let { Line(it, LunaColors.Pink) }
-            if (chat.status.isNotEmpty()) Line(chat.status, LunaColors.Muted, dot = LunaColors.Violet)
-            chat.ask?.let { AskCard(it, act.answer) }
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                MicButton(chat, onClick = mic, size = 48)
-                val sendNow = { if (!chat.busy && text.isNotBlank()) { act.send(text); text = "" } }
-                // a quiet pill: outline until it's focused, never a loud border
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = { text = it.take(2000) },          // Luna's limit for typed turns
-                    placeholder = { Text("Say something", color = LunaColors.Muted) },
-                    modifier = Modifier.weight(1f),
-                    maxLines = 4,
-                    shape = RoundedCornerShape(24.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = LunaColors.Violet,
-                        unfocusedBorderColor = LunaColors.Outline,
-                        disabledBorderColor = LunaColors.Outline,
-                        focusedContainerColor = LunaColors.Surface,
-                        unfocusedContainerColor = LunaColors.Surface,
-                        disabledContainerColor = LunaColors.Surface,
-                        cursorColor = LunaColors.Pink,
-                    ),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = { sendNow() }),
-                    enabled = !chat.recording,
-                )
-                if (chat.busy) {
-                    Button(onClick = act.stop, colors = ButtonDefaults.buttonColors(containerColor = LunaColors.Pink)) { Text("Stop") }
-                } else {
-                    Button(onClick = sendNow, enabled = text.isNotBlank() && !chat.recording) { Text("Send") }
+    if (showSettings) {
+        SettingsScreen(
+            s,
+            keepAwake = keepAwake, onKeepAwake = { keepAwake = it; prefs.keepAwake = it },
+            startPortrait = startPortrait, onStartPortrait = { startPortrait = it; prefs.startPortrait = it },
+            onCheck = act.check,
+            onForget = { showInfo = true },
+            onBack = { showSettings = false },
+        )
+    } else {
+        // see-through while the portrait shows: her WebView is under this Compose tree (MainActivity),
+        // and the activity's own background is the same colour
+        val fill = if (portrait) Modifier else Modifier.background(LunaColors.Background)
+        Column(Modifier.fillMaxSize().then(fill).safeDrawingPadding()) {
+            Header(
+                s, portrait, onSwitch = { portrait = it },
+                onSettings = { showSettings = true },
+                onForget = { showInfo = true },
+            )
+            val pairing = act.pairing()
+            if (portrait && pairing != null) {
+                PortraitPane(pairing, chat, onMic = mic, onStop = act.stop, onAnswer = act.answer, note = chat.note ?: micNote)
+            } else {
+                LazyColumn(
+                    state = list,
+                    reverseLayout = true,
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    // while she answers, her newest bubble carries what she's doing and the stop button
+                    items(chat.messages.asReversed(), key = { it.id }) {
+                        Bubble(it, working = if (chat.busy && it === last && !it.mine) chat.status else null, onStop = act.stop)
+                    }
                 }
+                (chat.note ?: micNote)?.let { Line(it, LunaColors.Pink) }
+                if (chat.busy && last?.mine != false) {
+                    // no reply bubble yet (sending, hearing you): the same line and stop button, under the list
+                    Working(chat.status, act.stop, Modifier.padding(horizontal = 16.dp, vertical = 2.dp))
+                } else if (!chat.busy && chat.status.isNotEmpty()) {
+                    Line(chat.status, LunaColors.Muted, dot = LunaColors.Violet)
+                }
+                chat.ask?.let { AskCard(it, act.answer) }
+                chat.picked?.let { PickedFile(it, act.detach) }
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    val ready = text.isNotBlank() || chat.picked != null      // words, a file, or both
+                    val sendNow = { if (!chat.busy && ready) { act.send(text); text = "" } }
+                    // the paperclip, inside the box: a picture or a document, if this Luna takes them (GET /info)
+                    val clip: (@Composable () -> Unit)? = if (pickTypes.isNullOrEmpty()) null else {
+                        {
+                            IconButton(onClick = { pick.launch(pickTypes) }, enabled = !chat.busy && !chat.recording) {
+                                Icon(
+                                    painterResource(R.drawable.ic_attach), contentDescription = "Attach a picture or file",
+                                    tint = if (chat.picked != null) LunaColors.Violet else LunaColors.Muted,
+                                )
+                            }
+                        }
+                    }
+                    // a quiet pill: outline until it's focused, never a loud border
+                    OutlinedTextField(
+                        value = text,
+                        onValueChange = { text = it.take(2000) },          // Luna's limit for typed turns
+                        placeholder = { Text("Say something", color = LunaColors.Muted) },
+                        modifier = Modifier.weight(1f),
+                        maxLines = 4,
+                        shape = RoundedCornerShape(24.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = LunaColors.Violet,
+                            unfocusedBorderColor = LunaColors.Outline,
+                            disabledBorderColor = LunaColors.Outline,
+                            focusedContainerColor = LunaColors.Surface,
+                            unfocusedContainerColor = LunaColors.Surface,
+                            disabledContainerColor = LunaColors.Surface,
+                            cursorColor = LunaColors.Pink,
+                        ),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                        keyboardActions = KeyboardActions(onSend = { sendNow() }),
+                        enabled = !chat.recording,
+                        trailingIcon = clip,
+                    )
+                    // (the paperclip moved into the text box: trailingIcon above)
+                    // the mic, or a send arrow once there's something to send (the keyboard's Send works too)
+                    if (ready && !chat.recording) {
+                        FilledIconButton(
+                            onClick = sendNow,
+                            enabled = !chat.busy,
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = LunaColors.Violet, contentColor = LunaColors.Background,
+                                disabledContainerColor = LunaColors.Surface, disabledContentColor = LunaColors.Muted,
+                            ),
+                            modifier = Modifier.size(48.dp),
+                        ) { Icon(painterResource(R.drawable.ic_send), contentDescription = "Send", modifier = Modifier.size(22.dp)) }
+                    } else {
+                        MicButton(chat, onClick = mic, size = 48)
+                    }
+                }
+                // Stop used to sit here; it's in her bubble now (Working)
             }
         }
     }
 
-    if (showInfo) InfoDialog(s, onClose = { showInfo = false }, onCheck = act.check, onForget = { showInfo = false; act.forget() })
+    if (showInfo) InfoDialog(s, forgetFirst = true, onClose = { showInfo = false }, onCheck = act.check, onForget = { showInfo = false; act.forget() })
 }
 
 @Composable
-private fun Header(s: Screen.Paired, portrait: Boolean, onSwitch: (Boolean) -> Unit, onInfo: () -> Unit) {
-    val (dot, words) = when (s.link) {
-        Link.Checking -> LunaColors.Muted to "checking"
-        Link.Connected -> LunaColors.Cyan to s.host
-        Link.Removed -> LunaColors.Pink to "unpaired"
-        is Link.Down -> LunaColors.Pink to "can't reach"
-    }
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        // tapping the name or the status opens the info box (connection, certificate, Forget)
-        Text("Luna", color = LunaColors.Pink, fontSize = 24.sp, fontWeight = FontWeight.Bold,
-            modifier = Modifier.clickable(onClick = onInfo))
-        // the switch sits in a track, so the two halves read as one control
-        Row(Modifier.clip(RoundedCornerShape(50)).background(LunaColors.Surface).padding(3.dp)) {
+private fun Header(s: Screen.Paired, portrait: Boolean, onSwitch: (Boolean) -> Unit, onSettings: () -> Unit, onForget: () -> Unit) {
+    // The address and status dot that sat on the right are gone: the line below the header
+    // still says when she can't be reached, and the emblem's menu and Settings show the connection.
+    Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
+        // her emblem on the left opens the menu
+        Box(Modifier.align(Alignment.CenterStart)) { EmblemMenu(s, onSettings = onSettings, onForget = onForget) }
+        // the switch in the middle, in a track so the two halves read as one control
+        Row(Modifier.align(Alignment.Center).clip(RoundedCornerShape(50)).background(LunaColors.Surface).padding(3.dp)) {
             Switch2("Chat", !portrait) { onSwitch(false) }
             Switch2("Portrait", portrait) { onSwitch(true) }
         }
-        // the status gives way first on a narrow screen, never the switch
-        Row(
-            Modifier.weight(1f).clickable(onClick = onInfo),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.End,
-        ) {
-            Box(Modifier.size(8.dp).clip(CircleShape).background(dot))
-            Text(
-                " $words", color = LunaColors.Muted, fontSize = 13.sp, maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-            )
+    }
+    // The old header, before the switch was centred and the address dropped:
+    // val (dot, words) = when (s.link) {
+    //     Link.Checking -> LunaColors.Muted to "checking"
+    //     Link.Connected -> LunaColors.Cyan to s.host
+    //     Link.Removed -> LunaColors.Pink to "unpaired"
+    //     is Link.Down -> LunaColors.Pink to "can't reach"
+    // }
+    // Row(
+    //     Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+    //     verticalAlignment = Alignment.CenterVertically,
+    //     horizontalArrangement = Arrangement.spacedBy(12.dp),
+    // ) {
+    //     // her emblem opens the menu; the status on the right still opens the info box directly
+    //     // Text("Luna", color = LunaColors.Pink, fontSize = 24.sp, fontWeight = FontWeight.Bold,
+    //     //     modifier = Modifier.clickable(onClick = onInfo))   // replaced by the emblem and its menu
+    //     EmblemMenu(onSettings = onInfo, onForget = onForget)
+    //     // the switch sits in a track, so the two halves read as one control
+    //     Row(Modifier.clip(RoundedCornerShape(50)).background(LunaColors.Surface).padding(3.dp)) {
+    //         Switch2("Chat", !portrait) { onSwitch(false) }
+    //         Switch2("Portrait", portrait) { onSwitch(true) }
+    //     }
+    //     // the status gives way first on a narrow screen, never the switch
+    //     Row(
+    //         Modifier.weight(1f).clickable(onClick = onInfo),
+    //         verticalAlignment = Alignment.CenterVertically,
+    //         horizontalArrangement = Arrangement.End,
+    //     ) {
+    //         Box(Modifier.size(8.dp).clip(CircleShape).background(dot))
+    //         Text(
+    //             " $words", color = LunaColors.Muted, fontSize = 13.sp, maxLines = 1,
+    //             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+    //         )
+    //     }
+    // }
+    if (s.link is Link.Removed || s.link is Link.Down) {
+        Line((s.link as? Link.Down)?.why ?: "This device was unpaired on the PC. Tap the moon at the top left, then Forget this PC, and pair again.", LunaColors.Pink)
+    }
+}
+
+/** The file waiting to go with the next message, with an x to drop it. */
+@Composable
+private fun PickedFile(f: imbored.luna.station.StationViewModel.Picked, onDrop: () -> Unit) {
+    Row(
+        Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp).clip(RoundedCornerShape(12.dp))
+            .background(LunaColors.Surface).padding(start = 12.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(painterResource(if (f.image) R.drawable.ic_image else R.drawable.ic_attach), contentDescription = null,
+            tint = LunaColors.Violet, modifier = Modifier.size(18.dp))
+        Text(
+            "  ${f.name}", color = LunaColors.Text, fontSize = 13.sp, maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
+        )
+        Text("  ${if (f.size >= 1 shl 20) "%.1f MB".format(f.size / 1048576.0) else "${(f.size + 1023) / 1024} KB"}",
+            color = LunaColors.Muted, fontSize = 12.sp)
+        IconButton(onClick = onDrop, modifier = Modifier.size(36.dp)) {
+            Icon(painterResource(R.drawable.ic_close), contentDescription = "Don't send this file", tint = LunaColors.Muted, modifier = Modifier.size(16.dp))
         }
     }
-    if (s.link is Link.Removed || s.link is Link.Down) {
-        Line((s.link as? Link.Down)?.why ?: "This device was unpaired on the PC. Tap Luna above to forget it and pair again.", LunaColors.Pink)
+}
+
+/** What she's doing ("Thinking", "Speaking"...) with a small stop button beside it. */
+@Composable
+private fun Working(status: String, onStop: () -> Unit, modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(6.dp).clip(CircleShape).background(LunaColors.Violet))
+        Spacer(Modifier.width(6.dp))
+        Text(status.ifEmpty { "Working" }, color = LunaColors.Muted, fontSize = 13.sp)
+        Spacer(Modifier.width(10.dp))
+        FilledIconButton(
+            onClick = onStop,
+            colors = IconButtonDefaults.filledIconButtonColors(containerColor = LunaColors.Pink, contentColor = LunaColors.Background),
+            modifier = Modifier.size(30.dp),
+        ) { Icon(painterResource(R.drawable.ic_stop), contentDescription = "Stop", modifier = Modifier.size(16.dp)) }
     }
 }
 
@@ -293,7 +417,7 @@ private fun PortraitPane(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             // her words while she answers (or yours while she's hearing them)
-            if (last != null && (chat.busy || !last.mine) && !last.waiting) {
+            if (last != null && (chat.busy || !last.mine) && !last.waiting && last.text.isNotEmpty()) {
                 Text(
                     last.text,
                     color = if (last.mine) LunaColors.Muted else LunaColors.Text,
@@ -320,7 +444,7 @@ private fun PortraitPane(
 }
 
 @Composable
-private fun Bubble(m: Message) {
+private fun Bubble(m: Message, working: String? = null, onStop: () -> Unit = {}) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = if (m.mine) Arrangement.End else Arrangement.Start) {
         // a small corner on the side the bubble came from, like a speech tail
         val shape = if (m.mine) RoundedCornerShape(18.dp, 4.dp, 18.dp, 18.dp) else RoundedCornerShape(4.dp, 18.dp, 18.dp, 18.dp)
@@ -331,7 +455,14 @@ private fun Bubble(m: Message) {
                 .background(if (m.mine) LunaColors.Mine else LunaColors.Surface)
                 .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
-            Text(
+            m.file?.let { name ->
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = if (m.text.isEmpty()) 0.dp else 4.dp)) {
+                    Icon(painterResource(R.drawable.ic_attach), contentDescription = null, tint = LunaColors.Muted, modifier = Modifier.size(16.dp))
+                    Text(" $name", color = LunaColors.Muted, fontSize = 13.sp, maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                }
+            }
+            if (m.text.isNotEmpty()) Text(
                 m.text,
                 color = if (m.waiting) LunaColors.Muted else LunaColors.Text,
                 fontStyle = if (m.waiting) FontStyle.Italic else FontStyle.Normal,
@@ -339,6 +470,7 @@ private fun Bubble(m: Message) {
                 lineHeight = 22.sp,
             )
             if (m.cut) Text("stopped", color = LunaColors.Muted, fontSize = 11.sp)
+            if (working != null) Working(working, onStop, Modifier.align(Alignment.End).padding(top = 6.dp))
         }
     }
 }
@@ -380,8 +512,8 @@ private fun AskCard(ask: imbored.luna.station.station.StationClient.Ask, answer:
 
 /** Where she is, whether she's reachable, her certificate, and Forget. */
 @Composable
-private fun InfoDialog(s: Screen.Paired, onClose: () -> Unit, onCheck: () -> Unit, onForget: () -> Unit) {
-    var confirm by rememberSaveable { mutableStateOf(false) }
+private fun InfoDialog(s: Screen.Paired, forgetFirst: Boolean, onClose: () -> Unit, onCheck: () -> Unit, onForget: () -> Unit) {
+    var confirm by rememberSaveable { mutableStateOf(forgetFirst) }
     AlertDialog(
         onDismissRequest = onClose,
         title = { Text(if (confirm) "Forget this PC?" else "Luna at ${s.host}") },
@@ -413,7 +545,8 @@ private fun InfoDialog(s: Screen.Paired, onClose: () -> Unit, onCheck: () -> Uni
         dismissButton = {
             Row {
                 if (!confirm) TextButton(onClick = { confirm = true }) { Text("Forget this PC") }
-                TextButton(onClick = { if (confirm) confirm = false else onClose() }) { Text(if (confirm) "Keep" else "Close") }
+                // opened on the question (the menu, Settings): Keep closes it; opened on the info, Keep goes back to it
+                TextButton(onClick = { if (confirm && !forgetFirst) confirm = false else onClose() }) { Text(if (confirm) "Keep" else "Close") }
             }
         },
     )

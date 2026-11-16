@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Luna's emblem on warm white (icons/ has the full set and the 512px store image). -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/luna_icon_background" />
+    <foreground android:drawable="@mipmap/luna_icon_foreground" />
+</adaptive-icon>
+<!-- The first icon, a lavender crescent on dark (drawable/ic_launcher_*.xml, kept for now):
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@drawable/ic_launcher_background" />
     <foreground android:drawable="@drawable/ic_launcher_foreground" />
 </adaptive-icon>
+-->

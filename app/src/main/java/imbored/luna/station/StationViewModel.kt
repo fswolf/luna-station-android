@@ -1,6 +1,8 @@
 package imbored.luna.station
 
 import android.app.Application
+import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import imbored.luna.station.audio.ClipPlayer
@@ -47,15 +49,23 @@ class StationViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** One bubble. [waiting]: shown as "…" until the words arrive. [cut]: stopped part way. */
-    data class Message(val id: Int, val mine: Boolean, val text: String, val waiting: Boolean = false, val cut: Boolean = false)
+    data class Message(
+        val id: Int, val mine: Boolean, val text: String, val waiting: Boolean = false, val cut: Boolean = false,
+        val file: String? = null,            // the name of a file sent with it
+    )
+
+    /** A file picked to go with the next message (its bytes stay in the view model). */
+    data class Picked(val name: String, val size: Long, val image: Boolean)
 
     data class Chat(
         val messages: List<Message> = emptyList(),
-        val busy: Boolean = false,           // a turn is running: Send becomes Stop, the mic is off
+        val busy: Boolean = false,           // a turn is running: her bubble shows Stop, the mic and attach are off
         val recording: Boolean = false,
         val status: String = "",
         val note: String? = null,            // the last thing that went wrong
         val ask: StationClient.Ask? = null,
+        val attachments: StationClient.Attachments? = null,   // what this Luna takes; null: no attach button
+        val picked: Picked? = null,
     )
 
     private val store = StationStore(app)
@@ -74,6 +84,7 @@ class StationViewModel(app: Application) : AndroidViewModel(app) {
     private var turnId: String? = null
     private var checking = false            // all of these are only touched on the main thread
     private var nextId = 0
+    private var file: StationClient.Attachment? = null    // the picked file's bytes, sent with the next message
 
     // --- pairing -------------------------------------------------------------------------
 
@@ -148,7 +159,22 @@ class StationViewModel(app: Application) : AndroidViewModel(app) {
                 checking = false
             }
             if (pairing == p) _screen.value = paired(p, link)
+            if (link == Link.Connected) learn(p)
         }
+    }
+
+    /** What this Luna can take (GET /info). An older Luna, or a failed look: no attach button. */
+    private suspend fun learn(p: Pairing) {
+        val info = try {
+            withContext(Dispatchers.IO) { StationClient.info(p) }.also {
+                // logcat (tag LunaStation): why there is or isn't a paperclip
+                android.util.Log.i("LunaStation", if (it == null) "GET /info: 404, an older Luna (no attachments)" else "GET /info: $it")
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("LunaStation", "GET /info failed: ${e.message ?: e.javaClass.simpleName}")
+            null
+        }
+        if (pairing == p) _chat.update { it.copy(attachments = info?.attachments) }
     }
 
     fun forget() {
@@ -157,6 +183,7 @@ class StationViewModel(app: Application) : AndroidViewModel(app) {
         turnJob?.cancel()          // the old turn must not write into the cleared conversation
         finish(null)
         store.clear()
+        file = null
         pairing = null
         _chat.value = Chat()
         _screen.value = Screen.Unpaired()
@@ -167,9 +194,89 @@ class StationViewModel(app: Application) : AndroidViewModel(app) {
     fun send(text: String) {
         val words = text.trim()
         val p = pairing ?: return
-        if (words.isEmpty() || _chat.value.busy || recorder != null) return
+        val f = file
+        if ((words.isEmpty() && f == null) || _chat.value.busy || recorder != null) return
         player.hush()
-        begin(Message(nextId++, mine = true, text = words)) { StationClient.say(p, words) }
+        file = null
+        _chat.update { it.copy(picked = null) }
+        begin(Message(nextId++, mine = true, text = words, file = f?.name)) {
+            if (f == null) StationClient.say(p, words) else StationClient.say(p, words, f)
+        }
+    }
+
+    /**
+     * A file picked to go with the next message. Checked here against what Luna said she takes
+     * (type and size), so a no is instant and in plain words; she checks again on her side.
+     */
+    fun attach(uri: Uri) {
+        val rules = _chat.value.attachments ?: return
+        val resolver = getApplication<Application>().contentResolver
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    var name = "file"
+                    var size = -1L
+                    resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { c ->
+                        if (c.moveToFirst()) {
+                            c.getString(0)?.let { name = it }
+                            if (!c.isNull(1)) size = c.getLong(1)
+                        }
+                    }
+                    val type = typeOf(resolver.getType(uri), name, rules)
+                        ?: return@runCatching "Luna can't take that kind of file. Pictures (JPEG, PNG, WebP), text, Markdown or PDF."
+                    val max = rules.maxBytes(type)
+                    if (size > max) return@runCatching tooBig(name, max)
+                    val bytes = resolver.openInputStream(uri)?.use { readUpTo(it, max + 1) }
+                        ?: return@runCatching "Couldn't open $name."
+                    if (bytes.size > max) return@runCatching tooBig(name, max)
+                    StationClient.Attachment(name, type, bytes)
+                }.getOrElse { "Couldn't read that file: ${it.message ?: it.javaClass.simpleName}" }
+            }
+            when (result) {
+                is StationClient.Attachment -> {
+                    file = result
+                    val image = rules.isImage(result.type)
+                    _chat.update {
+                        it.copy(
+                            picked = Picked(result.name, result.bytes.size.toLong(), image),
+                            note = if (image && rules.canSee == false) "Luna can't see pictures with the model she has loaded now." else null,
+                        )
+                    }
+                }
+                is String -> _chat.update { it.copy(note = result) }
+            }
+        }
+    }
+
+    /** The x on the picked file. */
+    fun detach() {
+        file = null
+        _chat.update { it.copy(picked = null) }
+    }
+
+    /** The file's type as Luna names it: what Android says, or else its extension. */
+    private fun typeOf(said: String?, name: String, rules: StationClient.Attachments): String? {
+        if (said != null && rules.allows(said)) return said
+        val byName = when (name.substringAfterLast('.', "").lowercase()) {
+            "jpg", "jpeg" -> "image/jpeg"; "png" -> "image/png"; "webp" -> "image/webp"
+            "txt" -> "text/plain"; "md", "markdown" -> "text/markdown"; "pdf" -> "application/pdf"
+            else -> null
+        }
+        return byName?.takeIf { rules.allows(it) }
+    }
+
+    private fun tooBig(name: String, max: Long) =
+        "$name is too big for Luna (up to ${if (max >= 1 shl 20) "${max shr 20} MB" else "${max shr 10} KB"})."
+
+    private fun readUpTo(input: java.io.InputStream, limit: Long): ByteArray {
+        val out = java.io.ByteArrayOutputStream()
+        val buf = ByteArray(64 * 1024)
+        while (out.size() < limit) {
+            val n = input.read(buf, 0, minOf(buf.size.toLong(), limit - out.size()).toInt())
+            if (n < 0) break
+            out.write(buf, 0, n)
+        }
+        return out.toByteArray()
     }
 
     /** The mic button: start listening, or (while listening) send what was said. */

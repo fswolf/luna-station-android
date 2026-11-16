@@ -57,6 +57,7 @@ class MainActivity : ComponentActivity() {
                         ChatScreen(s, chat, ChatActions(
                             send = vm::send, talk = vm::talk, stop = vm::stop, answer = vm::answer,
                             check = vm::check, forget = vm::forget, leave = vm::leave, pairing = vm::portraitPairing,
+                            attach = vm::attach, detach = vm::detach,
                         ))
                     }
                 }

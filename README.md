@@ -11,9 +11,10 @@ the speaker, and it talks to Luna over your home network, never the internet. A 
 tablet runs it today; other hardware (a Pi with a touchscreen, say) can follow later.
 
 <p align="center">
-  <img src="docs/screenshots/portrait.jpg" width="240" alt="The Portrait view: her 3D portrait, her words as she speaks them, and the talk button">
-  <img src="docs/screenshots/chat.png" width="240" alt="The Chat view: your message and her reply while her voice plays">
-  <img src="docs/screenshots/unpaired.png" width="240" alt="The first screen, before pairing with a PC">
+  <img src="docs/screenshots/chat.png" width="200" alt="The Chat view: her reply as text, with the paperclip in the text box and the mic">
+  <img src="docs/screenshots/portrait.jpg" width="200" alt="The Portrait view: her 3D portrait, her words as she speaks them, and the talk button">
+  <img src="docs/screenshots/menu.jpg" width="200" alt="The menu under her emblem: the connection, Settings, Forget this PC and Exit">
+  <img src="docs/screenshots/settings.png" width="200" alt="Settings: the connection and her certificate, keeping the screen on, which view to open in">
 </p>
 
 **Status:** early. Pairing, typing, talking and the Chat view were tested on a Samsung phone
@@ -58,8 +59,9 @@ There's no store listing; the app is installed from its APK file.
 A pairing code works once, for 15 minutes. A paired device stays paired, through restarts of
 the app, the device or Luna, until you forget it.
 
-Tap **Luna** at the top of the app for the connection, her certificate's fingerprint and
-**Forget this PC**. To compare the fingerprint on the PC:
+Tap her emblem at the top left for the menu: the connection, **Settings** (her certificate's
+fingerprint, keeping the screen on, which view to open in) and **Forget this PC**. To compare the
+fingerprint on the PC:
 
 ```bash
 openssl x509 -noout -fingerprint -sha256 -in ~/.config/ai-voice/station/luna-ca.crt
@@ -75,11 +77,15 @@ answers doesn't interrupt her.
 
 **Chat:** your words on the right, hers on the left.
 
-- **Type:** write in the box and press Send.
+- **Type:** write in the box and tap the send arrow (or the keyboard's Send).
 - **Talk:** tap the mic and speak. It sends by itself after a short pause, or tap the mic again
   to send. The mic is only on while you're talking.
 - **Her reply** fills in as she writes it, and her voice plays sentence by sentence.
-- **Stop:** while she answers, Send becomes Stop. The reply so far stays, marked "stopped".
+- **Attach:** the paperclip sends her a picture or a document (text, Markdown, PDF) with your
+  message, one at a time. It shows up when your Luna can take files, and pictures only when she
+  has a model loaded that can see them. The file is used for that answer and not kept.
+- **Stop:** while she answers, her reply shows a stop button. The reply so far stays, marked
+  "stopped".
 - **Her questions** (writing a file, running a command) show up with Allow and Deny.
   Unanswered for two minutes is a no.
 

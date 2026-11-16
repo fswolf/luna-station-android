@@ -26,7 +26,8 @@ app/src/main/java/imbored/luna/station/
     SpeechGate.kt          decides when you've stopped talking
     ClipPlayer.kt          plays her voice, clip by clip
     Wav.kt                 WAV in and out
-  ui/                    one file per screen, plus Common.kt and Theme.kt
+  ui/                    one file per screen, plus Common.kt, Theme.kt, EmblemMenu.kt
+                         (the top-left menu) and Prefs.kt (this device's settings)
 app/src/test/            unit tests (pure logic only, no device needed)
 tools/fake_station.py    a stand-in for Luna's station server, for testing
 tools/ci/                the GitHub build and release workflow, and how to set it up

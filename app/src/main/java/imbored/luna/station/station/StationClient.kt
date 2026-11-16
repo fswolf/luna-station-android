@@ -64,7 +64,8 @@ object StationClient {
     /**
      * Is this device still paired, and can it reach her? Asks for a turn that can't
      * exist: a paired device gets 404 (no such turn), an unpaired one 401. Cheap, and
-     * no turn is started. A /info endpoint on Luna's side would make this cleaner.
+     * no turn is started. Luna has GET /info now (info() below), but an older Luna doesn't,
+     * and this works with both.
      */
     fun check(p: Pairing): Check = try {
         val conn = open(p.host, p.port, p.ca, "/turn/check", p.token)
@@ -82,6 +83,64 @@ object StationClient {
     } catch (e: StationError) {
         Check.Unreachable(e.message ?: "Can't reach Luna.")
     }
+
+    // --- what this Luna can do ------------------------------------------------------------
+
+    /** What she takes as attachments (GET /info, docs/station-api.md in the Luna repo). */
+    data class Attachments(
+        val maxFiles: Int,
+        val imageTypes: List<String>,
+        val imageMaxBytes: Long,
+        val canSee: Boolean?,          // false: no vision model loaded; null: Luna can't tell
+        val docTypes: List<String>,
+        val docMaxBytes: Long,
+    ) {
+        fun allows(type: String) = type in imageTypes || type in docTypes
+        fun isImage(type: String) = type in imageTypes
+        fun maxBytes(type: String) = if (isImage(type)) imageMaxBytes else docMaxBytes
+    }
+
+    data class Info(val api: Int, val maxTyped: Int, val attachments: Attachments?)
+
+    /** GET /info, or null from a Luna older than it (404): then there's no attach button. */
+    fun info(p: Pairing): Info? {
+        val conn = open(p.host, p.port, p.ca, "/info", p.token)
+        return network(p.host) {
+            try {
+                when (val code = conn.responseCode) {
+                    200 -> json(conn).let { j ->
+                        val features = j.optJSONArray("features")?.let { a -> List(a.length()) { a.optString(it) } }.orEmpty()
+                        val a = j.optJSONObject("attachments")?.takeIf { "attachments" in features }
+                        Info(
+                            api = j.optInt("api", 1),
+                            maxTyped = j.optInt("max_typed", 2000),
+                            attachments = a?.let {
+                                val img = it.optJSONObject("images") ?: JSONObject()
+                                val doc = it.optJSONObject("documents") ?: JSONObject()
+                                Attachments(
+                                    maxFiles = it.optInt("max_files", 1),
+                                    imageTypes = types(img, "image/"),
+                                    imageMaxBytes = img.optLong("max_bytes", 10L shl 20),   // her default, if missing
+                                    canSee = if (!img.has("can_see") || img.isNull("can_see")) null else img.optBoolean("can_see"),
+                                    docTypes = types(doc, ""),
+                                    docMaxBytes = doc.optLong("max_bytes", 2L shl 20),   // her default, if missing
+                                )
+                            },
+                        )
+                    }
+                    404 -> null
+                    401 -> throw NotPairedError()
+                    else -> throw StationError("Luna answered $code.")
+                }
+            } finally {
+                conn.disconnect()
+            }
+        }
+    }
+
+    /** A list of types, as full MIME types ("jpeg" in the images list means image/jpeg). */
+    private fun types(o: JSONObject, prefix: String): List<String> =
+        o.optJSONArray("types")?.let { a -> List(a.length()) { i -> a.optString(i).let { t -> if ('/' in t) t else prefix + t } } }.orEmpty()
 
     // --- turns ---------------------------------------------------------------------------
 
@@ -102,6 +161,27 @@ object StationClient {
     /** Typed words. Returns the turn id. */
     fun say(p: Pairing, text: String): String =
         start(p, "/say", "application/json", JSONObject().put("text", text).toString().toByteArray())
+
+    /** One file sent with a message: a picture or a document, for that turn only. */
+    class Attachment(val name: String, val type: String, val bytes: ByteArray)
+
+    /**
+     * Words and a file in one message: POST /say as multipart/form-data, a "text" field (may be
+     * empty) and one "file" part. Returns the turn id; a file she won't take comes back as a
+     * StationError with Luna's own plain reason ("too big", "can't see pictures"...).
+     */
+    fun say(p: Pairing, text: String, file: Attachment): String {
+        val boundary = "luna-" + java.util.UUID.randomUUID().toString()
+        val name = file.name.replace(Regex("[\"\\r\\n]"), "_")
+        val body = java.io.ByteArrayOutputStream().apply {
+            write("--$boundary\r\nContent-Disposition: form-data; name=\"text\"\r\n\r\n".toByteArray())
+            write(text.toByteArray())
+            write("\r\n--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"$name\"\r\nContent-Type: ${file.type}\r\n\r\n".toByteArray())
+            write(file.bytes)
+            write("\r\n--$boundary--\r\n".toByteArray())
+        }.toByteArray()
+        return start(p, "/say", "multipart/form-data; boundary=$boundary", body)
+    }
 
     /** A recording (a RIFF WAV). Returns the turn id. */
     fun talk(p: Pairing, wav: ByteArray): String = start(p, "/talk", "audio/wav", wav)

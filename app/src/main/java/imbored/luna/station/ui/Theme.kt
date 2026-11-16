@@ -16,6 +16,7 @@ object LunaColors {
     val Muted = Color(0xFF9A93B0)
     val Mine = Color(0xFF352A52)      // your bubbles: surface with a little more violet in it
     val Outline = Color(0xFF3A2D55)   // field borders and dividers, the site's panel border
+    val IconWhite = Color(0xFFFBF8F3) // behind her emblem: the launcher icon's warm white (values/luna_icon_colors.xml)
 }
 
 // Violet is the colour of doing things (buttons, the mic, the switch), pink is Luna herself
