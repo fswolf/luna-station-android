@@ -1,5 +1,7 @@
 # Luna Station
 
+[![Discord](https://img.shields.io/badge/chat-Discord-5865F2?logo=discord&logoColor=white)](https://discord.gg/wEqrYjPxAU)
+
 An Android app that turns a phone or tablet into a room device for
 [Luna](https://github.com/fswolf/luna-local-agent): her portrait on the screen, a microphone
 to talk to her and a speaker for her voice. Put an old tablet on a stand in the kitchen and
@@ -128,6 +130,12 @@ Luna: Forget this PC, then pair with her again.
   the mic stops listening).
 - **Releases:** GitHub builds and signs the APK from a version tag; how to set that up is in
   [tools/ci/README.md](tools/ci/README.md).
+
+## Community
+
+Questions, ideas, or a station of your own to show off? Come say hi on
+[Discord](https://discord.gg/wEqrYjPxAU), the same server as Luna's. Feature ideas are welcome
+there too; bugs still go in the [issues](https://github.com/fswolf/luna-station-android/issues).
 
 ## Details
 
