@@ -91,6 +91,7 @@ class ChatActions(
     val pairing: () -> imbored.luna.station.station.Pairing?,
     val attach: (Uri) -> Unit,
     val detach: () -> Unit,
+    val voice: (Boolean) -> Unit,
 )
 
 /** The conversation, like a messaging app: your words on the right, hers on the left. */
@@ -107,6 +108,7 @@ fun ChatScreen(s: Screen.Paired, chat: Chat, act: ChatActions) {
     val prefs = remember { Prefs(context) }
     var keepAwake by remember { mutableStateOf(prefs.keepAwake) }
     var startPortrait by remember { mutableStateOf(prefs.startPortrait) }
+    var voice by remember { mutableStateOf(prefs.voice) }
     var portrait by rememberSaveable { mutableStateOf(prefs.startPortrait) }   // Chat | Portrait: both share the one turn
     var showSettings by rememberSaveable { mutableStateOf(false) }
     // Keep the screen on while she's open, if asked (Settings): a station on a stand shouldn't go dark.
@@ -146,6 +148,7 @@ fun ChatScreen(s: Screen.Paired, chat: Chat, act: ChatActions) {
             s,
             keepAwake = keepAwake, onKeepAwake = { keepAwake = it; prefs.keepAwake = it },
             startPortrait = startPortrait, onStartPortrait = { startPortrait = it; prefs.startPortrait = it },
+            voice = voice, onVoice = { voice = it; prefs.voice = it; act.voice(it) },
             onCheck = act.check,
             onForget = { showInfo = true },
             onBack = { showSettings = false },

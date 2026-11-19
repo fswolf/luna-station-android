@@ -15,6 +15,7 @@ import imbored.luna.station.station.Pairing
 import imbored.luna.station.station.StationClient
 import imbored.luna.station.station.StationError
 import imbored.luna.station.station.StationStore
+import imbored.luna.station.ui.Prefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -85,6 +86,7 @@ class StationViewModel(app: Application) : AndroidViewModel(app) {
     private var checking = false            // all of these are only touched on the main thread
     private var nextId = 0
     private var file: StationClient.Attachment? = null    // the picked file's bytes, sent with the next message
+    private var voice = Prefs(app).voice                  // play her voice here (Settings); off: text only
 
     // --- pairing -------------------------------------------------------------------------
 
@@ -248,6 +250,12 @@ class StationViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Settings, Play her voice: off stops what's playing now and skips her clips from here on. */
+    fun setVoice(on: Boolean) {
+        voice = on
+        if (!on) player.hush()
+    }
+
     /** The x on the picked file. */
     fun detach() {
         file = null
@@ -380,6 +388,8 @@ class StationViewModel(app: Application) : AndroidViewModel(app) {
                     ask = t.ask,
                 )
             }
+            // voice off: her clips are skipped, not fetched (no download, no sound, her portrait's mouth stays still)
+            if (!voice) played = maxOf(played, t.clips)
             if (!t.stopped) while (played < t.clips) {
                 val n = played
                 withContext(Dispatchers.IO) { runCatching { StationClient.clip(p, id, n) }.getOrNull() }?.let { player.add(it, id, n) }

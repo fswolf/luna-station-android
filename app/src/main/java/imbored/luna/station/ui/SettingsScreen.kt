@@ -54,6 +54,8 @@ fun SettingsScreen(
     onKeepAwake: (Boolean) -> Unit,
     startPortrait: Boolean,
     onStartPortrait: (Boolean) -> Unit,
+    voice: Boolean,
+    onVoice: (Boolean) -> Unit,
     onCheck: () -> Unit,
     onForget: () -> Unit,
     onBack: () -> Unit,
@@ -98,6 +100,7 @@ fun SettingsScreen(
                 }
             }
             Section("This device") {
+                Toggle("Play her voice", "Hear her answers here. Off: text only, and her portrait's mouth stays still.", voice, onVoice)
                 Toggle("Keep the screen on", "For a station on a stand. Uses more battery.", keepAwake, onKeepAwake)
                 Toggle("Open in Portrait", "Start on her portrait instead of the chat.", startPortrait, onStartPortrait)
             }
