@@ -3,9 +3,9 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-// Release signing and version come from the environment, so nothing secret is in the repo.
-// GitHub Actions sets these from the repo's secrets and the tag (tools/ci/release.yml);
-// a local build without them still works and makes a debug APK as usual.
+// Release signing comes from the environment, so nothing secret is in the repo. GitHub Actions
+// sets it from the repo's secrets (.github/workflows/release.yml); a local build without it
+// still works and makes a debug APK as usual.
 fun env(name: String): String? = providers.environmentVariable(name).orNull?.takeIf { it.isNotBlank() }
 val releaseKeystore = env("LUNA_KEYSTORE")?.let { file(it) }
 
@@ -21,10 +21,11 @@ android {
         applicationId = "imbored.luna.station"
         minSdk = 30            // Android 11 = Fire OS 8, the main target
         targetSdk = 36
-        // the release workflow passes the tag (v0.2.0 -> 0.2.0) and its run number, which only
-        // ever goes up, so each release installs over the last one
-        versionCode = env("LUNA_VERSION_CODE")?.toIntOrNull() ?: 1
-        versionName = env("LUNA_VERSION") ?: "0.6.0-dev"
+        // The version lives here, not in CI, so F-Droid (which builds the app itself) sees it too.
+        // publish-github.sh --tag vX.Y.Z sets both: versionCode = X*10000 + Y*100 + Z (0.6.2 -> 602),
+        // above every build GitHub made before (those used the Actions run number).
+        versionCode = 602
+        versionName = "0.6.2"
     }
 
     signingConfigs {
@@ -40,10 +41,12 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            // isMinifyEnabled = true        // (the F-Droid PR's switch; AGP 9 has optimization {} for it)
+            // isShrinkResources = true
+            // R8: shrinks the APK (about 30 MB before). Test a release build after changing anything
+            // here; keep rules for anything it strips by mistake go in src/main/keepRules/.
             optimization {
-                enable = false
+                enable = true
             }
             // only when the release key is there; without it the release APK is unsigned
             if (releaseKeystore != null) signingConfig = signingConfigs.getByName("release")

@@ -69,10 +69,13 @@ jobs:
           LUNA_KEYSTORE_PASSWORD: ${{ secrets.LUNA_KEYSTORE_PASSWORD }}
           LUNA_KEY_ALIAS: ${{ secrets.LUNA_KEY_ALIAS }}
           LUNA_KEY_PASSWORD: ${{ secrets.LUNA_KEY_PASSWORD }}
-          LUNA_VERSION: ${{ github.ref_name }}
-          LUNA_VERSION_CODE: ${{ github.run_number }}
         run: |
-          export LUNA_VERSION="${LUNA_VERSION#v}"
+          # the version is in app/build.gradle.kts (publish-github.sh --tag writes it); the tag must match
+          LUNA_VERSION="${GITHUB_REF_NAME#v}"
+          if ! grep -q "versionName = \"$LUNA_VERSION\"" app/build.gradle.kts; then
+            echo "Tag $GITHUB_REF_NAME doesn't match versionName in app/build.gradle.kts: tag with publish-github.sh --tag."
+            exit 1
+          fi
           chmod +x gradlew && ./gradlew --no-daemon testDebugUnitTest assembleRelease
           cp app/build/outputs/apk/release/app-release.apk "luna-station-$LUNA_VERSION.apk"
           sha256sum "luna-station-$LUNA_VERSION.apk" > "luna-station-$LUNA_VERSION.apk.sha256"

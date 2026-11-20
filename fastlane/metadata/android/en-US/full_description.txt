@@ -1,11 +1,11 @@
-Luna Station turn an Android phone or tablet into a room device for Luna.
+Luna Station turns an Android phone or tablet into a room device for Luna, the local AI agent.
 
-See her portrait on screen, talk to her through the microphone, and hear her reply through the speaker. 
-Set an old tablet on a stand in the kitchen to talk with Luna, watch her react, and hear her answer in the room. 
+See her portrait on screen, talk to her through the microphone, and hear her reply through the speaker. Set an old tablet on a stand in the kitchen to talk with Luna, watch her react, and hear her answer in that room.
 
-Think of an Echo Show but open source, and connected only to your own PC.
+Think of an Echo Show, but open source and connected only to your own PC.
 
-Luna does all the thinking on your PC or server. 
-The app provides the screen, microphone, and speaker, and connects to Luna over your home network?not the internet. 
+Luna does all the thinking on your PC or server. The app is the screen, the microphone and the speaker, and it talks to Luna over your home network, never the internet.
 
-It runs on phones and tablets today; support for other hardware, such as a Raspberry Pi with a touchscreen, may come later.
+You'll need Luna running on your PC: https://github.com/fswolf/luna-local-agent
+
+It runs on phones and tablets today; other hardware, such as a Raspberry Pi with a touchscreen, may come later.

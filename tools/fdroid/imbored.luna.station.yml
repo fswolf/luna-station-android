@@ -1,0 +1,25 @@
+Categories:
+  - Connectivity
+License: MIT
+AuthorName: fswolf
+SourceCode: https://github.com/fswolf/luna-station-android
+IssueTracker: https://github.com/fswolf/luna-station-android/issues
+Changelog: https://github.com/fswolf/luna-station-android/releases
+
+AutoName: Luna
+
+RepoType: git
+Repo: https://github.com/fswolf/luna-station-android.git
+
+Builds:
+  - versionName: 0.6.2
+    versionCode: 602
+    commit: v0.6.2
+    subdir: app
+    gradle:
+      - yes
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: 0.6.2
+CurrentVersionCode: 602
