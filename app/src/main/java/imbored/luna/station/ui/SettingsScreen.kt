@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
@@ -56,6 +57,8 @@ fun SettingsScreen(
     onStartPortrait: (Boolean) -> Unit,
     voice: Boolean,
     onVoice: (Boolean) -> Unit,
+    roomStation: Boolean,
+    onRoomStation: (Boolean) -> Unit,
     onCheck: () -> Unit,
     onForget: () -> Unit,
     onBack: () -> Unit,
@@ -100,6 +103,16 @@ fun SettingsScreen(
                 }
             }
             Section("This device") {
+                Text("Used as", color = LunaColors.Text)
+                Row(Modifier.clip(RoundedCornerShape(50)).background(LunaColors.Background).padding(3.dp)) {
+                    Choice("Room station", roomStation) { onRoomStation(true) }
+                    Choice("Phone", !roomStation) { onRoomStation(false) }
+                }
+                Text(
+                    if (roomStation) "Stays in one room. Her camera will be able to look when someone talks to it, so she knows who's there (coming soon)."
+                    else "Goes with you. The camera is only used when you ask (camera features coming soon).",
+                    color = LunaColors.Muted, fontSize = 13.sp,
+                )
                 Toggle("Play her voice", "Hear her answers here. Off: text only, and her portrait's mouth stays still.", voice, onVoice)
                 Toggle("Keep the screen on", "For a station on a stand. Uses more battery.", keepAwake, onKeepAwake)
                 Toggle("Open in Portrait", "Start on her portrait instead of the chat.", startPortrait, onStartPortrait)
@@ -132,6 +145,21 @@ private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) 
             content = content,
         )
     }
+}
+
+/** One half of a two-way choice, like the Chat | Portrait switch. */
+@Composable
+private fun Choice(label: String, on: Boolean, onClick: () -> Unit) {
+    Text(
+        label,
+        color = if (on) LunaColors.Background else LunaColors.Muted,
+        fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (on) LunaColors.Violet else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 6.dp),
+    )
 }
 
 /** One on/off setting: the whole row toggles it, not just the switch. */

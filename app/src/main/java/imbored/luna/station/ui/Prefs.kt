@@ -19,6 +19,15 @@ class Prefs(context: Context) {
         get() = p.getBoolean("voice", true)
         set(v) = p.edit().putBoolean("voice", v).apply()
 
+    /**
+     * How this device is used: a room station that stays put (its camera can later give her
+     * presence in that room) or a phone that goes with you (camera only when you ask).
+     * The camera features aren't built yet; they'll read this. Phone by default.
+     */
+    var roomStation: Boolean
+        get() = p.getString("role", "phone") == "room"
+        set(v) = p.edit().putString("role", if (v) "room" else "phone").apply()
+
     /** Open in the Portrait view instead of Chat. */
     var startPortrait: Boolean
         get() = p.getBoolean("start_portrait", false)

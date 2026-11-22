@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -109,6 +110,7 @@ fun ChatScreen(s: Screen.Paired, chat: Chat, act: ChatActions) {
     var keepAwake by remember { mutableStateOf(prefs.keepAwake) }
     var startPortrait by remember { mutableStateOf(prefs.startPortrait) }
     var voice by remember { mutableStateOf(prefs.voice) }
+    var roomStation by remember { mutableStateOf(prefs.roomStation) }
     var portrait by rememberSaveable { mutableStateOf(prefs.startPortrait) }   // Chat | Portrait: both share the one turn
     var showSettings by rememberSaveable { mutableStateOf(false) }
     // Keep the screen on while she's open, if asked (Settings): a station on a stand shouldn't go dark.
@@ -149,6 +151,7 @@ fun ChatScreen(s: Screen.Paired, chat: Chat, act: ChatActions) {
             keepAwake = keepAwake, onKeepAwake = { keepAwake = it; prefs.keepAwake = it },
             startPortrait = startPortrait, onStartPortrait = { startPortrait = it; prefs.startPortrait = it },
             voice = voice, onVoice = { voice = it; prefs.voice = it; act.voice(it) },
+            roomStation = roomStation, onRoomStation = { roomStation = it; prefs.roomStation = it },
             onCheck = act.check,
             onForget = { showInfo = true },
             onBack = { showSettings = false },
@@ -420,18 +423,26 @@ private fun PortraitPane(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             // her words while she answers (or yours while she's hearing them)
+            // About four lines tall; swipe in it to read the rest (it used to stop at four lines
+            // with "...", so the rest never showed). Each new message starts at its top.
             if (last != null && (chat.busy || !last.mine) && !last.waiting && last.text.isNotEmpty()) {
-                Text(
-                    last.text,
-                    color = if (last.mine) LunaColors.Muted else LunaColors.Text,
-                    maxLines = 4,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                    fontSize = 16.sp,
-                    lineHeight = 22.sp,
-                    modifier = Modifier.clip(RoundedCornerShape(14.dp))
+                val scroll = remember(last.id) { ScrollState(0) }
+                // following her newest words on its own was too jumpy to read along (Ryan, 2026-11-22):
+                // LaunchedEffect(last.id, last.text) { scroll.animateScrollTo(scroll.maxValue) }
+                Box(
+                    Modifier.clip(RoundedCornerShape(14.dp))
                         .background(LunaColors.Background.copy(alpha = 0.6f))
+                        .heightIn(max = 110.dp)
+                        .verticalScroll(scroll)
                         .padding(horizontal = 14.dp, vertical = 10.dp),
-                )
+                ) {
+                    Text(
+                        last.text,
+                        color = if (last.mine) LunaColors.Muted else LunaColors.Text,
+                        fontSize = 16.sp,
+                        lineHeight = 22.sp,
+                    )
+                }
             }
             note?.let { Text(it, color = LunaColors.Pink, fontSize = 13.sp) }
             if (chat.status.isNotEmpty()) Text(chat.status, color = LunaColors.Muted, fontSize = 13.sp)

@@ -24,8 +24,8 @@ android {
         // The version lives here, not in CI, so F-Droid (which builds the app itself) sees it too.
         // publish-github.sh --tag vX.Y.Z sets both: versionCode = X*10000 + Y*100 + Z (0.6.2 -> 602),
         // above every build GitHub made before (those used the Actions run number).
-        versionCode = 602
-        versionName = "0.6.2"
+        versionCode = 603
+        versionName = "0.6.3"
     }
 
     signingConfigs {
